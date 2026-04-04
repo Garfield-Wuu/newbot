@@ -18,16 +18,108 @@
 
 ---
 
-## 部署脚本（本仓库 `scripts/`）
+## 一键安装脚本说明（`scripts/install_orangepi_board.sh`）
+
+### 适用场景与运行位置
+
+- 脚本设计在 **香橙派（机器人板子）** 上执行，依赖 **开发电脑提供 NFS 共享**，把工程压缩包、已解压的配置目录、以及 YDLidar SDK 编译产物等放在 NFS 里，板子挂载后拷贝/安装。
+- 若你 **不用 NFS**（例如只从 GitHub `git clone`），则 **不要照搬第 8 步逻辑**；需自行把工程放到 `~/newbot_ws` 并手动拷贝 `rc.local`、dtb 等（见 [官方文档「一键部署」](https://newbot.readthedocs.io/zh-cn/latest/3_how_to_develop.html#id10)）。
+
+### 运行脚本之前必须准备好的事
+
+1. **开发电脑（NFS 服务端）**
+   - 已安装并配置 **`nfs-kernel-server`**，`/etc/exports` 中导出目录与脚本里 **`NFS_EXPORT`** 一致（示例见官方文档 [「安装和挂载 NFS」](https://newbot.readthedocs.io/zh-cn/latest/3_how_to_develop.html#nfs)）。
+   - 板子与电脑 **同一局域网可达**（或热点/AP 模式可访问该 IP）。
+
+2. **在 NFS 共享根目录下准备好两套路径（与脚本默认变量对应）**
+
+   脚本里（挂载到板子 `~/nfs` 之后）默认约定为：
+
+   | 变量 | 板子上挂载后的路径 | 里面要有什么 |
+   |------|-------------------|--------------|
+   | **`NEWBOT_RELEASE_DIR`** | `~/nfs/newbot/newbot_ws_v1.1` | 见下表「发布包目录」 |
+   | **`YDLIDAR_SDK_BUILD`** | `~/nfs/newbot_ws/src/lidar_sensors/ydlidar/YDLidar-SDK/build` | 已在 **电脑侧 NFS 目录里** 对 YDLidar-SDK **cmake/make 生成好的 `build` 目录**（脚本内执行 `sudo make install`） |
+
+   **发布包目录 `NEWBOT_RELEASE_DIR`（电脑 NFS 盘上实际路径 = `NFS_EXPORT/newbot/newbot_ws_v1.1/`）必须包含：**
+
+   | 文件/目录 | 作用 |
+   |-----------|------|
+   | **`newbot_ws.zip`** | 整机工作空间压缩包；脚本会 **`cp` 到板子 `~/`**，再 **`unzip` 解压为 `~/newbot_ws`**。 |
+   | **`newbot_ws/`**（与 zip 内容一致的**已解压目录**） | 脚本会从中拷贝 **`newbot_ws/src/config/rc.local` → `/etc`**，以及 **`newbot_ws/src/config/*v2*` → `/boot/dtb/rockchip`**。**仅有 zip 没有解压目录会导致第 8 步失败。** |
+
+   也就是说：**`newbot_ws.zip` 不是放在板子 home 里等脚本来「找」，而是先放在电脑 NFS 的 `.../newbot/newbot_ws_v1.1/` 下**；脚本挂载 NFS 后从该目录拷到板子 `~`。
+
+   **YDLidar SDK：** 在电脑 NFS 共享里维护一份 **`newbot_ws/src/lidar_sensors/ydlidar/YDLidar-SDK`**，并在该目录下建好 **`build/` 且已编译**，使板子挂载后路径 **`~/nfs/newbot_ws/src/.../build`** 存在。若你 NFS 目录名不是 `newbot_ws`，请改脚本里的 **`YDLIDAR_SDK_BUILD`**。
+
+   **电脑侧 NFS 导出目录结构示例**（`NFS_EXPORT` 根目录，与脚本默认变量一致时）：
+
+   ```
+   <NFS_EXPORT>/
+   ├── newbot/
+   │   └── newbot_ws_v1.1/          ← NEWBOT_RELEASE_DIR 挂载后的相对路径
+   │       ├── newbot_ws.zip        ← 必备
+   │       └── newbot_ws/           ← 必备（已解压，供 rc.local / dtb）
+   │           └── src/config/...
+   └── newbot_ws/                   ← 与 zip 同结构的工程树，用于 YDLidar
+       └── src/lidar_sensors/ydlidar/YDLidar-SDK/build/
+   ```
+
+3. **编辑脚本顶部「配置区」**
+
+   - **`NFS_HOST` / `NFS_EXPORT`**：改为你的电脑 IP 与 exports 路径。  
+   - **`NEWBOT_RELEASE_DIR`**：若发布包不在 `newbot/newbot_ws_v1.1`，改成实际目录（仍须同时含 **`newbot_ws.zip`** 与 **`newbot_ws/`** 解压树）。  
+   - **`LIDAR_TYPE`**：`YDLIDAR` / `M1C1_MINI` / `M1C1_MINI_TTYUSB`，且后续务必与 **`~/newbot_ws/src/config/start.sh`** 里一致。
+
+4. **板子侧**
+
+   - 建议 **新镜像 / 尚未部署过 `~/newbot_ws`** 或已自行备份；脚本会 **删除已有 `~/newbot_ws` 再解压**（有 10 秒取消时间）。  
+   - 若脚本放在即将被删除的旧 `~/newbot_ws` 里，**不要在 `~/newbot_ws` 内执行**；应先把 `install_orangepi_board.sh` 拷到如 **`/tmp`** 或 **`~/install_orangepi_board.sh`** 再运行（首次部署常见做法：用官方 zip 里带的脚本路径，或从 NFS 只读拷贝脚本到 `/tmp` 执行）。
+
+5. **网络与权限**
+
+   - 板子可 `ping` 通 `NFS_HOST`；`sudo` 可用（安装包、改 `/etc`、`/boot`）。
+
+### 安装逻辑（脚本按顺序做了什么）
+
+| 步骤 | 内容 |
+|------|------|
+| **1** | 安装 **NFS 客户端**、**avahi-daemon**；把 **`NFS_HOST:NFS_EXPORT`** 挂载到板子 **`~/nfs`**（若已挂载则跳过）。 |
+| **2** | 配置 **avahi** 主机名为 `orangepi`（**同一局域网勿多台同名 `orangepi.local`**）。 |
+| **3** | 配置 **中科大 ROS 源**，安装 **`ros-noetic-desktop-full`**；向 **`~/.bashrc`** 追加 **`source /opt/ros/noetic/setup.bash`**、**`ROS_IP` / `ROS_MASTER_URI`** 及所选 **`LIDAR_TYPE`**。 |
+| **4** | 安装导航/建图等 **常用 ROS 包**；可选安装 **`ros-noetic-rosbridge-suite`**（默认开，可用 `INSTALL_ROSBRIDGE_SUITE=0` 关闭）。 |
+| **5** | 进入 NFS 上的 **`YDLidar-SDK/build`**，执行 **`sudo make install`**（目录不存在则仅警告）。 |
+| **6** | 安装 **Python/pip** 及 **`requirements` 风格的一串 pip 包**（语音、网络、加解密等）。 |
+| **7** | 重装 **PulseAudio** 并设置 **默认扬声器 / USB 麦克风** 与音量、Mic 增益（设备名与实机声卡一致时才有效，否则需按 `pacmd` 输出自行改脚本）。 |
+| **8** | 进入 **`NEWBOT_RELEASE_DIR`**：将 **`newbot_ws.zip` → `~/`**；拷贝 **`rc.local`、dtb**；在 **`~` 删除旧 **`newbot_ws`** 后 **`unzip newbot_ws.zip`** 得到新工作空间。 |
+| **9** | 向 **`/boot/orangepiEnv.txt`** 追加 **SPI3 / UART2 / UART9** overlay（**UART2 使能后板载串口调试常失效**，请依赖 SSH/桌面）。 |
+| **结束** | 打印后续需 **手动** 执行的 **catkin 编译**、**ASR 模型**、**讯飞环境变量**、**与 start.sh 对齐 LIDAR_TYPE** 的提示，然后 **`reboot`**。 |
+
+### 脚本结束后在板子上还要做的事（官方流程一致）
+
+```bash
+killall rosmaster 2>/dev/null || true
+cd ~/newbot_ws
+source /opt/ros/noetic/setup.bash
+catkin_make -j2    # 内存不够改用 -j1
+```
+
+- 将 **离线 ASR 模型** 拷入 **`~/newbot_ws/src/audio/scripts/model/`**（若 zip 未含或本仓库 clone 被 `.gitignore` 排除）。  
+- 在 **`~/.bashrc`** 增加 **`XUNFEI_APPID` / `XUNFEI_APIKEY` / `XUNFEI_APISECRET`**（及按需其它变量）。  
+- 打开 **`~/newbot_ws/src/config/start.sh`**，确认 **`LIDAR_TYPE`** 与 **`~/.bashrc`** 一致。  
+- 重启后由 **`rc.local` → start.sh** 拉起的 **`roslaunch pkg_launch all.launch`** 才会使用新环境。
+
+### 脚本文件对照
 
 | 文件 | 用途 |
 |------|------|
-| **`install_snapshot_2026-04-04.sh`** | 2026-04-04 时 NFS 侧 `install.sh` 的**原样快照**，便于与整理版 diff。 |
-| **`install_orangepi_board.sh`** | **推荐使用**：顶部 **配置区** 集中填写 NFS 地址、`NEWBOT_RELEASE_DIR`、`LIDAR_TYPE` 等后再执行。默认顺带安装 **`ros-noetic-rosbridge-suite`**（可用环境变量 `INSTALL_ROSBRIDGE_SUITE=0` 关闭）。 |
+| **`install_orangepi_board.sh`** | **推荐使用**：变量化配置 + 上述 9 步逻辑。 |
+| **`install_snapshot_2026-04-04.sh`** | 与当时 **`nfs/install.sh`** 等价的**快照**，便于与整理版对比。 |
 
-执行示例：
+**执行示例（请先把脚本放到不会被删除的路径，例如已从 NFS 拷到 `/tmp`）：**
 
 ```bash
+bash /tmp/install_orangepi_board.sh
+# 或已在本仓库内且不会执行第 8 步删目录时：
 bash ~/newbot_ws/scripts/install_orangepi_board.sh
 ```
 
