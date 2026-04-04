@@ -131,6 +131,21 @@ bash ~/newbot_ws/scripts/install_orangepi_board.sh
 
 ---
 
+## RealVNC Server（远程桌面，可选）
+
+在香橙派 **Ubuntu 20.04 aarch64 + LightDM/XFCE** 上安装官方 **RealVNC Server**，以 **服务模式** 共享当前图形桌面（物理显示器 `:0`），与 **xrdp（3389）** 可并存；直连 VNC 常见端口为 **5900**，注意防火墙放行。
+
+| 项目 | 说明 |
+|------|------|
+| **安装脚本** | [`scripts/install_realvnc_server.sh`](scripts/install_realvnc_server.sh)：下载官方 ARM64 deb、卸载与之冲突的 **tightvncserver**、`dpkg` 安装并 `systemctl enable --now vncserver-x11-serviced.service`。 |
+| **执行方式** | 在板子本机终端（需输入 `sudo` 密码）：`chmod +x ~/newbot_ws/scripts/install_realvnc_server.sh` 后执行 `sudo bash ~/newbot_ws/scripts/install_realvnc_server.sh`。 |
+| **授权与连接** | 安装后在本机运行 **`sudo vnclicensewiz`**（或图形界面中的 VNC Server 向导），登录 RealVNC 账号或按向导配置直连；电脑端使用 [VNC Viewer](https://www.realvnc.com/en/connect/download/viewer/)。 |
+| **排障** | 查看监听：`ss -tlnp`（确认 5900/5901）；服务状态：`systemctl status vncserver-x11-serviced.service`。 |
+
+官方下载与说明：<https://www.realvnc.com/en/connect/download/vnc/linux/>
+
+---
+
 ## 近期开发记录（与官方文档互补）
 
 以下内容来自实机联调，若与随镜像发布的旧代码不一致，以本仓库为准。
