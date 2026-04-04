@@ -1,8 +1,12 @@
 <?xml version="1.0"?>
 <launch>
+    <arg name="ignore_serial_asr_id" default="false"/>
+
     <include file="$(find audio)/launch/audio.launch"/>
     
-    <include file="$(find base_control)/launch/base_control.launch"/>
+    <include file="$(find base_control)/launch/base_control.launch">
+        <arg name="ignore_serial_asr_id" value="$(arg ignore_serial_asr_id)"/>
+    </include>
     <include file="$(find pkg_launch)/launch/urdf.launch"/>
     
     <include file="$(find usb_camera)/launch/usb_camera.launch"/>

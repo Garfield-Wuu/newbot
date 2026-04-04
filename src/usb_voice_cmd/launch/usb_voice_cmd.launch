@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="vosk_model_path" default="$(env HOME)/vosk-model-small-cn-0.22"/>
+  <!-- 可选：仅当识别文本包含其一才匹配指令（留空则不过滤）。示例取消注释并改 pkg 内 rosparam：
+  <rosparam param="wake_substrings" subst_value="true">["小白","你好"]</rosparam>
+  -->
+
+  <node pkg="usb_voice_cmd" type="usb_voice_cmd_node.py" name="usb_voice_cmd" output="screen">
+    <param name="vosk_model_path" value="$(arg vosk_model_path)"/>
+    <!-- 默认 true：仅完整「小白你好」→LLM；「小白小白」→短答后进入指令窗口，空闲不转发动作口令。设 false 恢复旧版全文匹配。 -->
+    <param name="offline_style_gate" value="true"/>
+    <param name="phrase_chat" value="小白你好"/>
+    <param name="phrase_cmd_gate" value="小白小白"/>
+    <param name="command_arm_timeout_sec" value="15.0"/>
+    <param name="silence_volume_threshold" value="2500"/>
+    <!-- 前导静音：过久无声音则放弃本段 -->
+    <param name="max_leading_silence_sec" value="2.5"/>
+    <!-- 尾静音：说完后连续安静多久视为一句结束；过小易截断尾音，过大体感卡 -->
+    <param name="end_silence_sec" value="0.55"/>
+    <param name="max_utterance_sec" value="8.0"/>
+    <param name="cooldown_after_publish_sec" value="0.7"/>
+    <param name="min_speech_chunks" value="3"/>
+  </node>
+</launch>

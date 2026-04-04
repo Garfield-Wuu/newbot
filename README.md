@@ -151,6 +151,23 @@ bash ~/newbot_ws/scripts/install_orangepi_board.sh
 
 以下内容来自实机联调，若与随镜像发布的旧代码不一致，以本仓库为准。
 
+### 分支存档：`experiment/usb-voice-cmd`（2026-04）
+
+本分支集中存放 **USB 麦克风 + Vosk 替代/补充离线语音芯片** 的一整套改动，便于与 `main` 对比或回滚。建议在合并前打标签保留节点，例如：
+
+```bash
+git tag -a usb-voice-cmd-2026-04-04 -m "USB 语音门闩、延迟修复、launch 与 base_control 门控"
+git push origin usb-voice-cmd-2026-04-04
+```
+
+| 内容 | 路径或说明 |
+|------|------------|
+| **新包** | `src/usb_voice_cmd/`：Vosk ASR、`/asr_id`、订阅 `/enable_wakeup` 释放麦克风 |
+| **Launch** | `pkg_launch/voice_usb.launch`、`voice_usb_addon.launch`；`all.launch` 增加 `ignore_serial_asr_id` |
+| **底盘** | `base_control`：`ignore_serial_asr_id` 为 true 时不转发串口 `asr_id` |
+| **模型下载** | `rosrun usb_voice_cmd download_vosk_model_cn.py` |
+| **已知体感** | 口令识别仍受 **尾静音、Vosk 整句解码、TTS/聊天占麦** 影响；进一步提速需流式 ASR 或独立麦克风通道（见下节「延迟」） |
+
 ### 讯飞星火（Spark Lite）大模型
 
 - WebSocket 地址须为 **`wss://spark-api.xf-yun.com/v1.1/chat`**（文档与控制台一致，勿用明文 `ws://`）。
@@ -172,6 +189,28 @@ bash ~/newbot_ws/scripts/install_orangepi_board.sh
 - **原因**：[`src/audio/scripts/record.py`](src/audio/scripts/record.py) 中 `record_audio()` 用能量阈值判静音；**开始说话后**，连续静音超过 **`max_silence_time_sec / 2`** 即停止。旧默认 **`max_silence_time_sec=2`** → 约 **1 秒**停顿就断句。
 - **本仓库改动（2026-04）**：默认改为 **`max_silence_time_sec=4`**（说话后约 **2 秒**静音才结束）；[`src/audio/scripts/main.py`](src/audio/scripts/main.py) 聊天分支显式调用 **`record.record_audio(max_silence_time_sec=4)`**，便于按机子环境再调。
 - **仍不满意时**：略增 `max_silence_time_sec`；或在噪声允许时略降 **`silence_volume_threshold`**（默认 2500，底噪大勿过小）。
+
+### USB 麦克风模拟离线语音（`usb_voice_cmd`）
+
+- **用途**：离线语音芯片异常时，用 **USB 麦克风 + Vosk 中文** 识别短句，匹配 [`wakeup_process/cfg/asr.cfg`](src/wakeup_process/cfg/asr.cfg) 后向 **`/asr_id`** 发布与 MCU 一致的整型 ID，复用现有 **`wakeup_process` / `audio`** 链路。
+- **启动（二选一，勿混用）**  
+  - **从零拉起整机 + USB 语音**：`roslaunch pkg_launch voice_usb.launch`（内含 `all.launch`，且默认 **`ignore_serial_asr_id:=true`**）。  
+  - **已在跑 `all.launch` 时只加 USB 节点**：`roslaunch pkg_launch voice_usb_addon.launch`（**不要**再执行 `voice_usb.launch`，否则会再次 include `all.launch`，节点重名报错如 `new node registered with same name`，整机被踢）。  
+  - 纯 MCU 离线语音、不要 USB：`roslaunch pkg_launch all.launch`（默认 **`ignore_serial_asr_id:=false`**）。若既要 MCU 又要 USB，需自行避免双源或统一为 `ignore_serial_asr_id:=true` 仅用 USB。
+- **依赖**：`pip3 install -r ~/newbot_ws/src/usb_voice_cmd/requirements.txt`（或 `pip3 install vosk pyaudio`）；模型：在已 `catkin_make` 且 `source devel/setup.bash` 后执行 **`rosrun usb_voice_cmd download_vosk_model_cn.py`**（下载并解压到 **`~/vosk-model-small-cn-0.22`**），或手动从 [Vosk 模型页](https://alphacephei.com/vosk/models) 获取 `vosk-model-small-cn-0.22`；若 zip 解压多一层同名子目录，节点会自动探测。亦可用 launch 参数 **`vosk_model_path`** 指定。
+- **与 `audio` 争用麦克风**：`usb_voice_cmd` 订阅 **`/enable_wakeup`**；在 **`false`** 时关闭 PyAudio 输入流，以便聊天模式下 [`record.py`](src/audio/scripts/record.py) 独占设备。单 USB 麦时请避免两节点同时长开流。
+- **离线门闩（默认开）**：仅当识别为完整 **`小白你好`** 时发布 **chatgpt 行** 的 `/asr_id`（进大模型聊天）；仅当完整 **`小白小白`** 时发布 **wakeup 行** 短答并进入 **指令窗口**（此后一句才匹配前进/转圈等口令，超时回空闲）。避免「你好」「小白」等子串误进聊天。关闭：`~offline_style_gate:=false`。短语可调 `~phrase_chat` / `~phrase_cmd_gate`，超时 `~command_arm_timeout_sec`。（仅 USB 路径生效；`audio` 开机语音仍按 MCU 默认话术，以本段为准。）
+- **ID 与 `wakeup_process` 一致**：[`wakeup_process/cfg/asr.cfg`](src/wakeup_process/cfg/asr.cfg) 行序对应 `asr_id`；同一逻辑行可能对应多个字节，节点内用 `preferred_ros_int_for_line()` 优先选两位十六进制均为数字的取值，与实机芯片不一致时可改该函数。
+- **调参与延迟（2026-04）**  
+  - **尾静音** `~end_silence_sec`、**冷却** `~cooldown_after_publish_sec`、**前导静音** `~max_leading_silence_sec`、**最短语音块** `~min_speech_chunks`：见 [`usb_voice_cmd/launch/usb_voice_cmd.launch`](src/usb_voice_cmd/launch/usb_voice_cmd.launch)。  
+  - **已修逻辑**：结束一句录音时**不再**错误要求「累计 chunk 数 ≥ 前导静音换算值」（否则会强迫短句也录满约数秒才允许尾静音切段，延迟极大）。  
+  - 仍慢时：在安静环境略降 `end_silence_sec`；要进一步接近「边说边触发」需流式 Vosk 或硬件双路麦。
+
+### 拍照发邮件（`audio` / `api/mail.py`）
+
+- 使用 **QQ 邮箱 SMTP**（`smtp.qq.com:465`）。在运行 `roslaunch` 的环境中设置 **`EMAIL_ADDRESS`**、**`EMAIL_PWD`**（QQ 邮箱 **SMTP 授权码**，非登录密码）。  
+- 开机自启时请在 **`src/config/start.sh`** 里、`roslaunch` 之前 `export`，仅写 `~/.bashrc` 对 **`rc.local` → start.sh** 无效。  
+- 未配置时终端会提示设置变量；邮件发至 **`EMAIL_ADDRESS` 本邮箱**（自己收）。
 
 ### 远程可视化（Foxglove）
 

@@ -207,6 +207,7 @@ private:
 
     unsigned char enable_lidar = 0;//默认关闭雷达电源
 
+    bool ignore_serial_asr_id_ = false;
 };
 
 

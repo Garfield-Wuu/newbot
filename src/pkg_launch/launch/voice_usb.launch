@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<launch>
+  <!--
+    整机一键：all.launch + usb_voice_cmd（并默认忽略串口 asr_id）。
+    警告：若已在同一 roscore 上运行了 all.launch，切勿再执行本文件，否则会二次启动同名节点
+    （/base_control、/usb_camera 等），导致「new node registered with same name」并踢掉原进程。
+    已跑 all 时仅追加 USB 语音请用：roslaunch pkg_launch voice_usb_addon.launch
+  -->
+  <!-- USB 语音指令模式：忽略 MCU 串口上报的 asr_id，由 usb_voice_cmd 发布 /asr_id -->
+  <arg name="ignore_serial_asr_id" default="true"/>
+
+  <include file="$(find pkg_launch)/launch/all.launch">
+    <arg name="ignore_serial_asr_id" value="$(arg ignore_serial_asr_id)"/>
+  </include>
+
+  <include file="$(find usb_voice_cmd)/launch/usb_voice_cmd.launch"/>
+</launch>

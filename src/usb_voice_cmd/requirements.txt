@@ -1,0 +1,3 @@
+# pip3 install -r src/usb_voice_cmd/requirements.txt
+vosk>=0.3.45
+pyaudio>=0.2.11

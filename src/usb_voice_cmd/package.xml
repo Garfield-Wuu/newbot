@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>usb_voice_cmd</name>
+  <version>0.1.0</version>
+  <description>USB 麦克风采集 + Vosk 短句识别，匹配 asr.cfg 并发布 /asr_id，模拟离线语音模块。</description>
+  <maintainer email="orangepi@todo.todo">orangepi</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+
+  <exec_depend>wakeup_process</exec_depend>
+  <exec_depend>rospkg</exec_depend>
+  <exec_depend>python3-pyaudio</exec_depend>
+
+  <export/>
+</package>

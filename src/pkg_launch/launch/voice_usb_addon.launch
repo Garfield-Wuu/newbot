@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+  <!--
+    在「已有 roscore + 已运行 all.launch（或其它已拉起整机节点）」时，仅追加 USB 语音节点。
+    勿使用 voice_usb.launch（会再次 include all.launch，导致节点重名、整机被踢下线）。
+
+    用法：
+      roslaunch pkg_launch voice_usb_addon.launch
+
+    注意：若 all.launch 启动时 ignore_serial_asr_id 为 false，MCU 仍会发 /asr_id，与 USB 双源。
+    需要 USB 独占指令时，请用带参启动 all：
+      roslaunch pkg_launch all.launch ignore_serial_asr_id:=true
+    再本 launch；或重启整机后改 start.sh / 启动命令。
+  -->
+  <include file="$(find usb_voice_cmd)/launch/usb_voice_cmd.launch"/>
+</launch>

@@ -105,6 +105,9 @@ BaseControl::BaseControl() : nh("~")
 
     nh.param<string>("dev", dev, "/dev/ttyS3");
     nh.param<int>("buad", buad, 115200);
+    nh.param<bool>("ignore_serial_asr_id", ignore_serial_asr_id_, false);
+    if (ignore_serial_asr_id_)
+        ROS_WARN("ignore_serial_asr_id=true: 串口 MCU 上报的 asr_id 将不会发布到 /asr_id（供 USB 语音模拟离线模块时使用）");
 
 
     //订阅主题command
@@ -408,8 +411,8 @@ void BaseControl::run()
         all_encoder1 += mcu_data.encoder1;
         all_encoder2 += mcu_data.encoder2;
 
-        //处理语音命令和发布TTS，0表示没有命令
-        if(mcu_data.asr_id != 0)//有asr命令
+        //处理语音命令和发布TTS，0表示没有命令（可由 ignore_serial_asr_id 关闭，避免与 usb_voice_cmd 双源）
+        if(!ignore_serial_asr_id_ && mcu_data.asr_id != 0)//有asr命令
         {
             ROS_INFO(">>>>>> asr_id: %d",mcu_data.asr_id);
             std_msgs::Int32 msg;
