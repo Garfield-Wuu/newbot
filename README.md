@@ -1,10 +1,16 @@
 # newbot
 
-香橙派 + ROS Noetic 的「小白」机器人工作空间（catkin），含语音、视觉、雷达、运动等节点。
+ROS Noetic workspace for the Newbot robot on Orange Pi: voice (ASR/TTS, iFlytek Spark), USB camera + RKNN, YDLIDAR, navigation, and STM32 base control. Maintained fork with deploy scripts and docs.
 
-**官方开发与刷机文档（必读）**：[Newbot — 如何开发 / 一键部署 / 开机脚本等](https://newbot.readthedocs.io/zh-cn/latest/3_how_to_develop.html)
+| | 链接 |
+|---|------|
+| **Upstream（fork 来源）** | [gitee.com/cv-robot/newbot](https://gitee.com/cv-robot/newbot) |
+| **本仓库（GitHub）** | [github.com/Garfield-Wuu/newbot](https://github.com/Garfield-Wuu/newbot) |
+| **官方文档** | [Newbot Readthedocs — 开发 / 一键部署 / 开机脚本](https://newbot.readthedocs.io/zh-cn/latest/3_how_to_develop.html) |
 
-本仓库维护者：**Garfield-Wuu**（GitHub: [Garfield-Wuu/newbot](https://github.com/Garfield-Wuu/newbot)）
+**维护者**：Garfield-Wuu
+
+**中文摘要**：香橙派 + ROS Noetic「小白」机器人 catkin 工作空间，含语音、视觉、雷达、运动等节点。
 
 ---
 
