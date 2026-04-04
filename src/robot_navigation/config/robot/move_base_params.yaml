@@ -1,0 +1,12 @@
+shutdown_costmaps: false
+controller_frequency: 10.0 #控制器频率，即向基座发送速度命令的频率 默认值：20.0
+planner_patience: 5.0 # 在空间清理操作执行前，路径规划器等待多长时间（秒）用来找出一个有效规划 默认值：5.0
+controller_patience: 15.0 #在空间清理操作执行前，控制器会等待多长时间（秒）用来找出一个有效控制 默认值：15.0
+conservative_reset_dist: 3.0 # 当在地图中清理出空间时候，距离机器人几米远的障碍将会从costmap清除 默认值：3.0
+planner_frequency: 5.0 # 全局路径规划的更新速率，当机器在避障表现较好时，此参数较小即可
+oscillation_timeout: 10.0 #执行修复操作之前，允许的震荡时间是几秒 默认值：0.0=无限超时
+oscillation_distance: 0.2 #机器人需要移动多少距离才算作没有震荡 默认值：0.5
+
+
+#http://wiki.ros.org/move_base?distro=noetic
+

@@ -1,0 +1,15 @@
+%YAML:1.0
+---
+CameraMat: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data: [510.36892403,   0.,         660.14932991,
+       0.,         510.11531958, 354.92146054,
+       0.,           0.,           1.        ]
+DistCoeff: !!opencv-matrix
+   rows: 4
+   cols: 1
+   dt: d
+   data: [-0.03755295, 0.0053876, 0.00073573, -0.0006263]
+ImageSize: [ 1280, 720 ]

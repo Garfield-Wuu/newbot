@@ -1,0 +1,61 @@
+DWAPlannerROS:
+
+# Robot Configuration Parameters
+  max_vel_x:  0.10  #0.22  #机器人的最大 x 速度 默认值：0.55
+  min_vel_x: -0.10 #-0.22 #机器人的最小x速度（以m / s为单位），向后运动为负 默认值：0.0
+
+  max_vel_y: 0.0 #机器人的最大 y 速度
+  min_vel_y: 0.0 #机器人的最小 y 速度
+
+# The velocity when robot is moving in a straight line
+  max_vel_trans:  0.10  #0.22 #机器人最大平移速度的绝对值 默认值：0.55
+  min_vel_trans:  0.05 #0.11 #机器人最小平移速度的绝对值 默认值：0.1
+
+  max_vel_theta: 2.0 #2.75 #机器人最大旋转速度的绝对值 默认值：1.0
+  min_vel_theta: 1.0 #1.37 #机器人最小旋转速度的绝对值 默认值：0.4
+
+  acc_lim_x: 2.5 #机器人的 x 加速度极限 默认值：2.5
+  acc_lim_y: 0.0 #机器人的 y 加速度极限 默认值：2.5
+  acc_lim_theta: 3.2 #机器人的旋转加速度极限 默认值：3.2
+
+# Goal Tolerance Parameters
+  xy_goal_tolerance: 0.05 #实现目标时控制器在 x 和 y 距离内的公差 默认值：0.10
+  yaw_goal_tolerance: 0.17 #控制器在实现目标时偏航/旋转时的弧度公差 默认值：0.05
+  latch_xy_goal_tolerance: false ##如果被锁定，如果机器人到达目标xy位置，它将简单地在原地旋转，即使它最终超出了目标公差 默认值：假
+
+# Forward Simulation Parameters
+  sim_time: 2.0 #1.5 #向前模拟轨迹的时间 默认值：1.7 太小不停地拐弯，轨迹不流畅；太大走大圈和轨迹不符合
+  vx_samples: 6 #20 #探索 x 速度空间时要使用的样本数 默认值：3
+  vy_samples: 0 #探索 y 速度空间时要使用的样本数 默认值：10
+  vth_samples: 40 #40 #探索θ速度空间时要使用的样本数量 默认值：20
+  controller_frequency: 10.0 #调用此控制器的频率（以 Hz 为单位） 默认值：20.0
+
+# Trajectory Scoring Parameters
+  path_distance_bias: 32.0 #32.0 #控制器应保持与给定路径的接近程度的权重 默认值：32.0 #本地规划器与全局路径保持一致的权重 较大的值将使本地规划器更倾向于跟踪全局路径
+  goal_distance_bias: 20.0 #20.0 #控制器应尝试达到其本地目标的权重也控制速度 默认值：24.0 #会使机器人与全局路径的匹配度偏低
+  occdist_scale: 0.01 #0.02 #控制器应尝试避免障碍物的权重 默认值：0.01
+  forward_point_distance: 0.325 #从机器人中心点到放置一个附加得分点的距离 默认值：0.325
+  stop_time_buffer: 0.2 #机器人在碰撞前必须停止的时间量，以使轨迹在几秒钟内被视为有效 默认值：0.2
+  scaling_speed: 0.25 #开始缩放机器人占地面积的速度的绝对值，以 m/s 为单位 默认值：0.25
+  max_scaling_factor: 0.2 #将机器人的占地面积缩小到以下列的最大系数 默认值：0.2
+
+# Oscillation Prevention Parameters
+  oscillation_reset_dist: 0.05 #在振荡标志重置之前，机器人必须以米为单位行进多远 默认值：0.05
+
+# Debugging
+  publish_traj_pc : true
+  publish_cost_grid_pc: true
+
+  holonomic_robot: false #是否为全向机器人 值为false时为差分机器人; 为true时表示全向机器人
+   
+   
+#http://wiki.ros.org/dwa_local_planner?distro=noetic
+
+#参数参考:
+#https://blog.csdn.net/weixin_42005898/article/details/98478759
+#导航调优指南.pdf
+#https://blog.csdn.net/luohuiwu/article/details/92985584
+
+
+
+

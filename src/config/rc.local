@@ -1,0 +1,20 @@
+#!/bin/sh -e
+
+create_ap --fix-unmanaged #关闭热点
+
+play /home/orangepi/newbot_ws/src/audio/scripts/sound/boot.mp3
+
+sudo chmod 777 /dev/spidev3.0
+sudo chmod 777 /sys/class/gpio/export
+echo 128 > /sys/class/gpio/export
+echo 130 > /sys/class/gpio/export
+sudo chmod 777 /sys/class/gpio/gpio128/value
+sudo chmod 777 /sys/class/gpio/gpio128/direction
+sudo chmod 777 /sys/class/gpio/gpio130/value
+sudo chmod 777 /sys/class/gpio/gpio130/direction
+gpio mode 20 out && gpio write 20 0
+
+su - orangepi -c "mkdir -p /home/orangepi/.ros"
+su - orangepi -c "cd /home/orangepi/newbot_ws/src/config && bash start.sh > /home/orangepi/.ros/start.log &"
+
+exit 0

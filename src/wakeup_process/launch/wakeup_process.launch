@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="wakeup_process" type="wakeup_process" name="wakeup_process" output="screen"> 
+        <param name="asr_cfg" value="$(find wakeup_process)/cfg/asr.cfg" type="str" />
+    </node>
+</launch>

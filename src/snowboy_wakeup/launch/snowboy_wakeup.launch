@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node pkg="snowboy_wakeup" name="snowboy_wakeup" type="main.py" output="screen">
+  </node>
+
+</launch>

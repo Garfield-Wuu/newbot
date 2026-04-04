@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+
+    <node pkg="move_action" type="move_server" name="move_server" output="screen"/>
+    <node pkg="move_action" type="move_client_cmd" name="move_client_cmd" output="screen"/>
+
+</launch>

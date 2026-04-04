@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/orangepi/nfs/newbot/newbot_ws/src/ydlidar/YDLidar-SDK/devel/setup.sh

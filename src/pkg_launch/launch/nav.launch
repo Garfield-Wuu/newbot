@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+    <include file="$(find pkg_launch)/launch/all.launch"/>
+    
+    <!--select 1 line of the 3 lines below-->
+    <include file="$(find robot_navigation)/launch/blank_map_move_base.launch"/>
+    <!--<include file="$(find robot_navigation)/launch/robot_slam.launch"/>-->
+    <!--<include file="$(find robot_navigation)/launch/robot_navigation.launch"/>-->
+      
+</launch>

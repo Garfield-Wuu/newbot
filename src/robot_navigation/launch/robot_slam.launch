@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<launch>
+    
+    <include file="$(find robot_navigation)/launch/slam/gmapping.launch" />
+
+    <include file="$(find robot_navigation)/launch/move_base.launch" />
+    
+    <!--save map cmd: cd maps && rosrun map_server map_saver -f map-->
+</launch> 

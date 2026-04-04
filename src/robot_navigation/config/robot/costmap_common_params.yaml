@@ -1,0 +1,18 @@
+obstacle_range: 3.0 #障碍物范围 机器人只会更新其地图包含距离移动基座obstacle_range米以内的障碍物的信息
+raytrace_range: 3.5 #光线追踪范围 机器人将尝试清除raytrace_range米外的空间，在代价地图中清除raytrace_range米外的障碍物
+
+#footprint: [[-0.07, -0.06], [-0.07, 0.06], [0.05, 0.06], [0.05, -0.06]]
+robot_radius: 0.07 #圆形机器人半径 直径12cm,半径6cm
+
+inflation_radius: 0.2 #1.0 #膨胀半径 如果机器人经常撞到障碍物就需要增大该值!!!!!，若经常无法通过狭窄地方就减小该值!!!!!
+cost_scaling_factor: 3.0 #3.0 # exponential rate at which the obstacle cost drops off(default: 10)
+
+map_type: costmap
+observation_sources: scan
+scan: {sensor_frame: laser_link, data_type: LaserScan, topic: scan, marking: true, clearing: true}
+#marking表示是否可以使用该传感器来标记障碍物
+#clearing表示是否可以使用该传感器来清除障碍物标记为自由空间
+
+#参数参考了github turtlebot3代码
+#https://github.com/ROBOTIS-GIT/turtlebot3/tree/master/turtlebot3_navigation/param/costmap_common_params_burger.yaml
+

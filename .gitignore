@@ -1,0 +1,28 @@
+# Catkin / ROS
+build/
+devel/
+logs/
+.catkin_workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+# 体积过大或易再生成的依赖（克隆后请从网盘/NFS/官方包恢复）
+src/audio/scripts/model/
+
+# YDLidar SDK 本地 build（源码保留，build 可重建）
+src/lidar_sensors/ydlidar/YDLidar-SDK/build/
+
+# 杂项
+*.log
+.DS_Store

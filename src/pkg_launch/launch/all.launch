@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<launch>
+    <include file="$(find audio)/launch/audio.launch"/>
+    
+    <include file="$(find base_control)/launch/base_control.launch"/>
+    <include file="$(find pkg_launch)/launch/urdf.launch"/>
+    
+    <include file="$(find usb_camera)/launch/usb_camera.launch"/>
+    <include file="$(find img_decode)/launch/img_decode.launch"/>
+    <include file="$(find rknn_yolov6)/launch/rknn_yolov6.launch"/>
+    <include file="$(find img_encode)/launch/img_encode.launch"/>
+
+    <!-- lidar.launch会根据环境变量启动不同的雷达节点 -->
+    <include file="$(find pkg_launch)/launch/lidar.launch"/>
+    <include file="$(find object_track)/launch/object_track.launch"/>
+    
+    <include file="$(find wakeup_process)/launch/wakeup_process.launch"/>
+    <include file="$(find move_action)/launch/move_action.launch"/>
+</launch>

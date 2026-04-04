@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<launch>
+
+ 
+  <node pkg="base_control" type="base_control" name="base_control" output="screen">
+  
+ 	  <param name="sub_cmd_vel_topic" value="/cmd_vel" type="str" />
+ 	  
+	  <param name="pub_odom_topic" value="/odom" type="str" />
+	  
+	  <param name="odom_frame_id" value="odom" type="str" />
+ 	  
+	  <param name="base_frame_id" value="base_footprint" type="str" />
+	
+      <param name="dev" value="/dev/ttyS2" type="str" />
+	  
+	  <param name="buad" value="115200" type="int" />
+
+	  
+  </node>
+
+</launch>

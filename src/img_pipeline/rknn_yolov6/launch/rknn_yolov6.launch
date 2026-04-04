@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<launch>
+
+    <node pkg="rknn_yolov6" type="rknn_yolov6" name="rknn_yolov6" output="screen">
+
+        <param name="is_offline_image_mode" value="false" type="bool" />
+
+        <param name="model_file"          value="$(find rknn_yolov6)/config/yolov6n_85.rknn" type="str" />
+        <param name="yaml_file"           value="$(find rknn_yolov6)/config/yolov6.yaml" type="str" />
+        <param name="offline_images_path" value="$(find rknn_yolov6)/config/images" type="str" />
+        <param name="offline_output_path" value="$(find rknn_yolov6)/config/images_output" type="str" />
+
+        <param name="sub_image_topic" value="/camera/image_raw" type="str" />
+        <param name="pub_image_topic" value="/camera/image_det" type="str" />
+
+        <param name="pub_det_topic" value="/ai_msg_det" type="str" />
+
+        <param name="print_perf_detail" value="false" type="bool" />
+        <param name="use_multi_npu_core" value="false" type="bool" />
+        <param name="output_want_float" value="true" type="bool" />
+
+        <param name="conf_threshold" value="0.3" type="double" />
+        <param name="nms_threshold" value=" 0.3" type="double" />
+
+    </node>
+</launch>
+

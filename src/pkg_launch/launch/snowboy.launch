@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+    <include file="$(find pkg_launch)/launch/all.launch"/>
+    
+    <include file="$(find snowboy_wakeup)/launch/snowboy_wakeup.launch"/>
+</launch>

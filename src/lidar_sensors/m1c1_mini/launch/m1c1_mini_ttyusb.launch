@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="m1c1_mini" type="m1c1_mini" name="m1c1_mini" output="screen">
+    <param name="dev" value="/dev/ttyUSB0" type="str" />
+	  <param name="buad" value="115200" type="int" />
+  </node>
+</launch>

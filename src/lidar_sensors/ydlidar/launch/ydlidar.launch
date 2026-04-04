@@ -1,0 +1,41 @@
+<launch>
+    <arg name="lidar_frame" default="laser_link"/> 
+    
+    <node name="ydlidar_node"  pkg="ydlidar"  type="ydlidar_node" output="screen">
+
+        <!--参数说明：https://github.com/YDLIDAR/ydlidar_ros_driver-->
+        <!-- /dev/ydlidar /dev/ttyTHS1 is nano 40 pin uart-->
+        <param name="port"         type="string" value="/dev/ttyS9"/>  
+        <param name="frame_id"     type="string" value="$(arg lidar_frame)"/>
+        <param name="ignore_array"     type="string" value=""/> <!--忽略角度范围-->
+
+        <!-- int property -->
+        <param name="baudrate"         type="int" value="115200"/>  
+        <!-- 0:TYPE_TOF, 1:TYPE_TRIANGLE, 2:TYPE_TOF_NET -->
+        <param name="lidar_type"       type="int" value="1"/>  
+        <!-- 0:YDLIDAR_TYPE_SERIAL, 1:YDLIDAR_TYPE_TCP -->
+        <param name="device_type"         type="int" value="0"/>  
+        <param name="sample_rate"         type="int" value="3"/>  
+        <param name="abnormal_check_count"         type="int" value="4"/>  
+
+        <!-- bool property -->
+        <param name="resolution_fixed"    type="bool"   value="true"/>
+        <param name="auto_reconnect"    type="bool"   value="true"/>
+        <param name="reversion"    type="bool"   value="true"/>
+        <param name="inverted"    type="bool"   value="true"/>
+        <param name="isSingleChannel"    type="bool"   value="true"/>
+        <param name="intensity"    type="bool"   value="false"/>
+        <param name="support_motor_dtr"    type="bool"   value="true"/>
+        <param name="invalid_range_is_inf"    type="bool"   value="false"/>
+        <param name="point_cloud_preservative"    type="bool"   value="false"/>
+
+        <!-- float property -->
+        <param name="angle_min"    type="double" value="-180" />
+        <param name="angle_max"    type="double" value="180" />
+        <param name="range_min"    type="double" value="0.1" />
+        <param name="range_max"    type="double" value="12.0" />
+        <!-- frequency is invalid, External PWM control speed -->
+        <param name="frequency"    type="double" value="10.0"/>
+    </node>
+    
+</launch>

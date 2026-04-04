@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="object_track" type="object_track" name="object_track" output="screen">
+ 	  
+    <param name="calibration_file" value="$(find object_track)/cfg/fisheye.yml" type="string" />
+    <param name="camera_frame" value="camera_link" type="string" />
+    <param name="laser_frame" value="laser_link" type="string" />
+    <param name="pub_image_topic" value="/camera/image_det_track" type="string" />
+
+    <param name="sub_laser_topic" value="/scan" type="string" />
+    <param name="sub_image_topic" value="/camera/image_det" type="string" />
+    <param name="sub_det_topic" value="/ai_msg_det" type="string" />
+    <param name="tracking_class_name" value="person" type="string" />
+
+    <param name="width" value="640" type="int" />
+    <param name="height" value="360" type="int" />
+    <param name="object_area_threshold" value="20" type="int" />
+
+    <param name="kp_angular" value="0.01" type="double" />
+    <param name="kp_linear" value="0.5" type="double" />
+    <!-- <param name="max_angular" value="1.5" type="double" />
+    <param name="max_linear" value="0.1" type="double" /> -->
+    <param name="max_angular" value="3.0" type="double" />
+    <param name="max_linear" value="0.15" type="double" />
+
+    <param name="keep_distance" value=" 0.3" type="double" />
+    <param name="valid_distance_min" value="0.05" type="double" />
+    <param name="valid_distance_max" value="5.0" type="double" />
+
+    <param name="control_linear" value="true" type="bool" />
+
+  </node>
+</launch>

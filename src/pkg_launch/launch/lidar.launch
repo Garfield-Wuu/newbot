@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- 根据环境变量启动不同的雷达节点 -->
+    <arg name="lidar_type" default="$(optenv LIDAR_TYPE)" />
+    
+    <group if="$(eval lidar_type == 'M1C1_MINI')">
+        <include file="$(find m1c1_mini)/launch/m1c1_mini.launch"/> <!--顶部有三颗螺丝的M1C1 MINI-->
+    </group>
+    
+    <group if="$(eval lidar_type == 'M1C1_MINI_TTYUSB')">
+        <include file="$(find m1c1_mini)/launch/m1c1_mini_ttyusb.launch"/> <!--顶部有三颗螺丝的M1C1 MINI，如果数据线连接到USB接口-->
+    </group>
+    
+    <group if="$(eval lidar_type == 'YDLIDAR')">
+        <include file="$(find ydlidar)/launch/ydlidar.launch"/> <!--顶部有两颗螺丝的YDLIDAR-->
+    </group>
+    
+    <group if="$(eval lidar_type == 'LD14')">
+        <include file="$(find ldlidar_ros)/launch/ld14.launch"/> <!--顶部有小红点的LD14-->
+    </group>
+    
+    <group if="$(eval lidar_type == '')">
+        <include file="$(find ydlidar)/launch/ydlidar.launch"/> <!--默认启动顶部有两颗螺丝的YDLIDAR-->
+    </group>
+    
+</launch>
+
+
+
+
+
