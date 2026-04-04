@@ -140,6 +140,7 @@ bash ~/newbot_ws/scripts/install_orangepi_board.sh
 | **安装脚本** | [`scripts/install_realvnc_server.sh`](scripts/install_realvnc_server.sh)：下载官方 ARM64 deb、卸载与之冲突的 **tightvncserver**、`dpkg` 安装并 `systemctl enable --now vncserver-x11-serviced.service`。 |
 | **执行方式** | 在板子本机终端（需输入 `sudo` 密码）：`chmod +x ~/newbot_ws/scripts/install_realvnc_server.sh` 后执行 `sudo bash ~/newbot_ws/scripts/install_realvnc_server.sh`。 |
 | **授权与连接** | 安装后在本机运行 **`sudo vnclicensewiz`**（或图形界面中的 VNC Server 向导），登录 RealVNC 账号或按向导配置直连；电脑端使用 [VNC Viewer](https://www.realvnc.com/en/connect/download/viewer/)。 |
+| **仅用 IP 连不上** | 默认可能**不监听 5900**（走云中继）。若要用 **`192.168.x.x:5900` 直连**：执行 **`sudo bash ~/newbot_ws/scripts/enable_realvnc_direct_tcp.sh`**（会写 `/etc/vnc/...` 与 **`/root/.vnc/config.d/vncserver-x11.custom`**），再 **`sudo vncpasswd -service`**，**`ss -tlnp`** 应能看到 **5900**。若仍无 5900，多为 **Connect Lite 等订阅不允许 IP 直连**，只能 **Viewer 登录账号**从列表连或升级套餐。**Windows Viewer** 里该连接「属性 → Security」请**取消勾选 SSO、智能卡**，否则即使用密码也常失败。 |
 | **排障** | 查看监听：`ss -tlnp`（确认 5900/5901）；服务状态：`systemctl status vncserver-x11-serviced.service`。 |
 
 官方下载与说明：<https://www.realvnc.com/en/connect/download/vnc/linux/>
@@ -164,6 +165,13 @@ bash ~/newbot_ws/scripts/install_orangepi_board.sh
 - **`audio`** 只订阅 **`/tts`**。  
   - 模拟对话可：``rostopic pub -1 /tts std_msgs/String "data: '我在#chatgpt'"``（需 `/enable_wakeup` 为 true）。  
   - **关雷达**不能仅靠 ``#off_lidar`` 的 `/tts`：应发 **`/asr_id`**（`asr.cfg` 第 51 行对应本工程映射为 **`data: 81`**），或手动 `rosservice call /stop_scan` + `/enable_lidar` false。详见联调笔记。
+
+### 聊天模式录音：避免「还没说完就停」
+
+- **现象**：唤醒后进聊天（如 `#chatgpt`），说一句长话或句中停顿，录音提前结束，ASR 只收到半句。
+- **原因**：[`src/audio/scripts/record.py`](src/audio/scripts/record.py) 中 `record_audio()` 用能量阈值判静音；**开始说话后**，连续静音超过 **`max_silence_time_sec / 2`** 即停止。旧默认 **`max_silence_time_sec=2`** → 约 **1 秒**停顿就断句。
+- **本仓库改动（2026-04）**：默认改为 **`max_silence_time_sec=4`**（说话后约 **2 秒**静音才结束）；[`src/audio/scripts/main.py`](src/audio/scripts/main.py) 聊天分支显式调用 **`record.record_audio(max_silence_time_sec=4)`**，便于按机子环境再调。
+- **仍不满意时**：略增 `max_silence_time_sec`；或在噪声允许时略降 **`silence_volume_threshold`**（默认 2500，底噪大勿过小）。
 
 ### 远程可视化（Foxglove）
 

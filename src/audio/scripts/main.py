@@ -742,7 +742,8 @@ class Audio:
                 self.emoji.set_eye_color((50, 205, 50))
                 self.emoji.set_display_cmd("normal")  # 下发正常表情命令，显示绿色表示正在录音
 
-                audio_file_name = record.record_audio()  # 录音过程中禁止唤醒
+                # 录音参数见 record.record_audio：仍嫌断得太快可加大 max_silence_time_sec，或略降 silence_volume_threshold
+                audio_file_name = record.record_audio(max_silence_time_sec=4)
 
                 self.emoji.set_eye_color(cur_eye_color)
                 self.emoji.set_display_cmd("normal")  # 下发正常表情命令，恢复眼睛颜色

@@ -17,7 +17,11 @@ stream = pa.open(format=sample_format,
                  input=True)
 stream.stop_stream()
 
-def record_audio(max_time_sec = 10, max_silence_time_sec = 2, silence_volume_threshold = 2500): #板子上2500(有风扇和雷达噪音干扰),电脑上1000
+def record_audio(max_time_sec = 10, max_silence_time_sec = 4, silence_volume_threshold = 2500):
+    # max_silence_time_sec: 开头连续静音超过该秒数则放弃（认为没人说话）
+    # 开始说话后：连续静音超过 max_silence_time_sec/2 秒即判定说完并停止录音。
+    # 原先默认 2 → 说完后仅约 1 秒停顿就断句，容易「还没说完就停」；改为 4 → 约 2 秒停顿。
+    # silence_volume_threshold: 板子上 2500（风扇/雷达底噪），安静环境可试 1800～2200；过小易误触发不停录。
     
     frames = []
     silence_time = 0
