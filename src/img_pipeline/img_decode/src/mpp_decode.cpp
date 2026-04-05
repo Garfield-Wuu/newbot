@@ -114,16 +114,21 @@ int MppDecode::init_packet_and_frame(int width, int height)
 
 	int ret;
 
-	// ION internal — 与 gitee 参考版本一致；DMA32 flag (ION|DMA32) 在本平台 MPP 中会导致 segfault，不使用
+	// ION internal：环境变量 RK_DMA_HEAP_USE_DMA32=1 可令 MPP 在 <4GB 物理地址分配（RGA 兼容）
+	// DMA_HEAP internal 不导出 fd（mpp_buffer_get_fd 返回 0），因此用 ION 路径保留合法 fd
 	ret = mpp_buffer_group_get_internal(&frmGrp, MPP_BUFFER_TYPE_ION);
 	if (ret)
 	{
-		MPP_ERR("frmGrp ION failed (%d), try DMA_HEAP\r\n", ret);
+		fprintf(stderr, "[mpp_decode] frmGrp ION failed (%d), try DMA_HEAP\n", ret); fflush(stderr);
 		ret = mpp_buffer_group_get_internal(&frmGrp, MPP_BUFFER_TYPE_DMA_HEAP);
 		if (ret) {
-			MPP_ERR("frmGrp DMA_HEAP also failed (%d)\r\n", ret);
+			fprintf(stderr, "[mpp_decode] frmGrp DMA_HEAP also failed (%d)\n", ret); fflush(stderr);
 			return -1;
 		}
+	}
+	else
+	{
+		fprintf(stderr, "[mpp_decode] frmGrp ION ok\n"); fflush(stderr);
 	}
 
 	ret = mpp_buffer_group_get_internal(&pktGrp, MPP_BUFFER_TYPE_ION);
@@ -185,20 +190,8 @@ int MppDecode::init_packet_and_frame(int width, int height)
 
 	mpp_frame_set_buffer(frame, frmBuf);
 
-	// #region agent log INIT: log init success
-	{
-		FILE *_lf = fopen("/home/orangepi/.cursor/debug-b311e8.log", "a");
-		if (_lf) {
-			struct timeval _tv; gettimeofday(&_tv, NULL);
-			int frm_fd = mpp_buffer_get_fd(frmBuf);
-			void *frm_ptr = mpp_buffer_get_ptr(frmBuf);
-			fprintf(_lf, "{\"sessionId\":\"b311e8\",\"hypothesisId\":\"INIT\",\"location\":\"mpp_decode.cpp:init\",\"message\":\"init ok stable\",\"data\":{\"buf_size\":%zu,\"frm_fd\":%d,\"frm_va\":%lu,\"pkt_sz\":%zu},\"timestamp\":%lld}\n",
-				buf_size, frm_fd, (unsigned long)(uintptr_t)frm_ptr, packetSize,
-				(long long)_tv.tv_sec*1000+_tv.tv_usec/1000);
-			fclose(_lf);
-		}
-	}
-	// #endregion
+	fprintf(stderr, "[mpp_decode] init ok: buf_size=%zu frm_fd=%d frm_ptr=%p\n",
+	        buf_size, mpp_buffer_get_fd(frmBuf), mpp_buffer_get_ptr(frmBuf)); fflush(stderr);
 
 	return 0;
 }
@@ -310,7 +303,7 @@ int MppDecode::get_dmabuf_fd(int *out_fd)
 	if (!out_fd || !last_rga_buffer)
 		return -1;
 	int raw = mpp_buffer_get_fd(last_rga_buffer);
-	if (raw <= 0)
+	if (raw < 0)
 		return -1;
 	int d = dup(raw);
 	if (d < 0)
@@ -378,31 +371,6 @@ int MppDecode::get_image(MppFrame &frame, cv::Mat &image)
 	last_h = height;
 	last_wstride_px = wstride_px;
 	last_hstride_px = hstride_px;
-
-	// #region agent log DECODE: pixel check (first 5 frames)
-	{
-		static int _gc = 0;
-		if (_gc++ < 5) {
-			int nz = 0;
-			size_t total = (size_t)height * row_bytes;
-			for (size_t _i = 0; _i < std::min(total, (size_t)1000); _i++)
-				if (base[_i] > 5) nz++;
-			unsigned char cp0=0,cp1=0,cp2=0;
-			size_t cx = (size_t)(height/2) * row_bytes + (size_t)(width/2) * 3u;
-			if (cx + 2 < total) { cp0=base[cx]; cp1=base[cx+1]; cp2=base[cx+2]; }
-			FILE *_lf = fopen("/home/orangepi/.cursor/debug-b311e8.log", "a");
-			if (_lf) {
-				struct timeval _tv; gettimeofday(&_tv, NULL);
-				fprintf(_lf, "{\"sessionId\":\"b311e8\",\"hypothesisId\":\"PIXEL\",\"location\":\"mpp_decode.cpp:get_image\",\"message\":\"pixel check\",\"data\":{\"fmt\":%d,\"w\":%u,\"h\":%u,\"hstride\":%u,\"vstride\":%u,\"wstride_px\":%u,\"fd\":%d,\"nz_1k\":%d,\"center\":[%d,%d,%d],\"buf_is_frmBuf\":%d},\"timestamp\":%lld}\n",
-					(int)fmt, width, height, h_stride, v_stride, wstride_px,
-					mpp_buffer_get_fd(buffer), nz, cp0, cp1, cp2,
-					(buffer == frmBuf) ? 1 : 0,
-					(long long)_tv.tv_sec*1000+_tv.tv_usec/1000);
-				fclose(_lf);
-			}
-		}
-	}
-	// #endregion
 
 	return 0;
 }

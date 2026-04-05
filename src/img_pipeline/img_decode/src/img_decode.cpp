@@ -9,7 +9,8 @@
 
 namespace {
 // 0 = RGA 可用；>0 = 失败冷却帧计数（每帧递减，归零后自动重试）
-std::atomic<int> g_rga_cooldown{0};
+std::atomic<int> g_rga_fd_cooldown{0};   // FD-RGA 路径冷却计数
+std::atomic<int> g_rga_va_cooldown{0};   // VA-RGA 路径冷却计数
 static constexpr int RGA_RETRY_FRAMES = 30;
 }
 #endif
@@ -29,8 +30,12 @@ ImgDecode::ImgDecode() : nh("~")
     nh.param<int>("width", width, 1280);
     nh.param<int>("height", height, 720);
     nh.param<bool>("lazy_compressed_subscribe", lazy_compressed_subscribe, false);
-    /* 默认关：RK356x 上 MPP→RGA 常因 dma-buf 不兼容报 dmesg；DMA_HEAP 缓冲见 mpp_decode。需试 RGA 时设 true */
+    /* 旧参数保留，默认 false；实际由下面两个精细参数控制 */
     nh.param<bool>("use_rga", use_rga, false);
+    /* 阶段2：VA-RGA（heap 拷贝后虚拟地址 RGA），默认关 */
+    nh.param<bool>("use_rga_va_fallback", use_rga_va_fallback, false);
+    /* 阶段3：FD-RGA（importbuffer_fd 路径），默认关；高风险实验 */
+    nh.param<bool>("use_rga_fd_experimental", use_rga_fd_experimental, false);
 
     raw_image_pub = nh.advertise<sensor_msgs::Image>(pub_raw_image_topic, 10);
 
@@ -111,72 +116,75 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
     {
         bool ok = false;
 
-        // 冷却计数 > 0 时跳过 RGA，逐帧递减；归零后自动重试
-        int cooldown = g_rga_cooldown.load(std::memory_order_relaxed);
-        if (cooldown > 0)
+        // ── 路径A：FD-RGA 实验（use_rga_fd_experimental=true 时启用）────────────
+        if (use_rga_fd_experimental)
         {
-            g_rga_cooldown.store(cooldown - 1, std::memory_order_relaxed);
-        }
-
-        const bool try_rga = use_rga && (cooldown <= 0);
-
-        if (try_rga)
-        {
-            RK_U32 rw, rh, rws, rhs;
-            mpp_decode.get_last_rga_layout(&rw, &rh, &rws, &rhs);
-            int dmabuf_fd = -1;
-            if (mpp_decode.get_dmabuf_fd(&dmabuf_fd) == 0)
+            int cooldown = g_rga_fd_cooldown.load(std::memory_order_relaxed);
+            if (cooldown > 0)
             {
-                const int rga_fd_ret = rga_resize_fd(dmabuf_fd, (int)rw, (int)rh, (int)rws, (int)rhs,
-                                                     msg_pub.data.data(), dst_w, dst_h);
-                if (close(dmabuf_fd) != 0)
-                    ROS_WARN_THROTTLE(30.0, "close(dmabuf_fd) failed errno=%d", errno);
-                if (rga_fd_ret == 0)
-                {
-                    ok = true;
-                }
-                else
-                {
-                    g_rga_cooldown.store(RGA_RETRY_FRAMES, std::memory_order_relaxed);
-                    ROS_WARN_THROTTLE(5.0, "img_decode: RGA(fd) failed, cooling down %d frames then retry. "
-                                     "Check: dmesg|grep rga", RGA_RETRY_FRAMES);
-                }
+                g_rga_fd_cooldown.store(cooldown - 1, std::memory_order_relaxed);
             }
             else
             {
-                ROS_WARN_THROTTLE(10.0, "get_dmabuf_fd failed, falling back to OpenCV");
+                RK_U32 rw, rh, rws, rhs;
+                mpp_decode.get_last_rga_layout(&rw, &rh, &rws, &rhs);
+                int dmabuf_fd = -1;
+                if (mpp_decode.get_dmabuf_fd(&dmabuf_fd) == 0)
+                {
+                    const int rga_fd_ret = rga_resize_fd(dmabuf_fd, (int)rw, (int)rh, (int)rws, (int)rhs,
+                                                         msg_pub.data.data(), dst_w, dst_h);
+                    if (close(dmabuf_fd) != 0)
+                        ROS_WARN_THROTTLE(30.0, "close(dmabuf_fd) failed errno=%d", errno);
+                    if (rga_fd_ret == 0)
+                    {
+                        ok = true;
+                    }
+                    else
+                    {
+                        g_rga_fd_cooldown.store(RGA_RETRY_FRAMES, std::memory_order_relaxed);
+                        ROS_WARN_THROTTLE(5.0, "img_decode: FD-RGA failed, cooling %d frames. dmesg|grep rga",
+                                         RGA_RETRY_FRAMES);
+                    }
+                }
+                else
+                {
+                    ROS_WARN_THROTTLE(10.0, "img_decode: get_dmabuf_fd failed");
+                }
             }
         }
 
         if (!ok)
         {
-            // ION/uncached Mat 直接 resize 极慢；先 clone 到 heap，再 resize
+            // ION/uncached Mat 直接 resize 极慢；先 copyTo 到 heap，再操作
             cv::Mat cached;
             image.copyTo(cached);
-            cv::Mat resized;
-            cv::resize(cached, resized, cv::Size(dst_w, dst_h), 0, 0, cv::INTER_LINEAR);
-            memcpy(msg_pub.data.data(), resized.data, msg_pub.data.size());
-            // #region agent log H3-opencv-fallback
+
+            // ── 路径B：VA-RGA 实验（use_rga_va_fallback=true 时启用）────────────
+            if (use_rga_va_fallback)
             {
-                static int _ocv_log_cnt = 0;
-                if (++_ocv_log_cnt <= 3) {
-                    FILE *_f = fopen("/home/orangepi/.cursor/debug-b311e8.log", "a");
-                    if (_f) { fprintf(_f, "{\"sessionId\":\"b311e8\",\"hypothesisId\":\"H3\",\"location\":\"img_decode.cpp:opencv_fallback\",\"message\":\"fallback\",\"data\":{\"cooldown\":%d,\"try_rga\":%d,\"cnt\":%d},\"timestamp\":%ld}\n", cooldown, try_rga?1:0, _ocv_log_cnt, (long)time(NULL)); fclose(_f); }
+                int va_cd = g_rga_va_cooldown.load(std::memory_order_relaxed);
+                if (va_cd > 0)
+                {
+                    g_rga_va_cooldown.store(va_cd - 1, std::memory_order_relaxed);
+                }
+                else
+                {
+                    ok = (rga_resize(cached, msg_pub.data.data(), dst_w, dst_h) == 0);
+                    if (!ok)
+                    {
+                        g_rga_va_cooldown.store(RGA_RETRY_FRAMES, std::memory_order_relaxed);
+                        ROS_WARN_THROTTLE(10.0, "img_decode: VA-RGA failed, cooling %d frames", RGA_RETRY_FRAMES);
+                    }
                 }
             }
-            // #endregion
-        }
-        else
-        {
-            // #region agent log H2-rga-success
+
+            // ── 路径C：OpenCV 兜底（始终可用）──────────────────────────────────
+            if (!ok)
             {
-                static int _rga_log_cnt = 0;
-                if (++_rga_log_cnt <= 3) {
-                    FILE *_f = fopen("/home/orangepi/.cursor/debug-b311e8.log", "a");
-                    if (_f) { fprintf(_f, "{\"sessionId\":\"b311e8\",\"hypothesisId\":\"H2\",\"location\":\"img_decode.cpp:rga_success\",\"message\":\"rga_ok\",\"data\":{\"cnt\":%d},\"timestamp\":%ld}\n", _rga_log_cnt, (long)time(NULL)); fclose(_f); }
-                }
+                cv::Mat resized;
+                cv::resize(cached, resized, cv::Size(dst_w, dst_h), 0, 0, cv::INTER_LINEAR);
+                memcpy(msg_pub.data.data(), resized.data, msg_pub.data.size());
             }
-            // #endregion
         }
     }
 #else
@@ -234,11 +242,10 @@ int main(int argc, char** argv)
     ImgDecode img_decode;
 
     std::thread check_thread(&ImgDecode::run_check_thread, &img_decode);
+    check_thread.detach();
 
     ros::spin();
 
-
-    
     return 0;
 }
 

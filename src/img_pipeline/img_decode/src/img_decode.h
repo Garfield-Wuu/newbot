@@ -40,8 +40,14 @@ public:
     /** false：启动即订阅 JPEG（推荐，避免无人订 /camera/image_raw 时断流）；true：仅在有订阅者时再订阅压缩图 */
     bool lazy_compressed_subscribe;
 
-    /** 是否尝试 RGA 缩放；若为 false 则始终 OpenCV（省 ioctl / 内核日志） */
+    /** 已弃用：由 use_rga_fd_experimental 替代，保留仅用于兼容旧 launch */
     bool use_rga;
+
+    /** 阶段2实验：先 copyTo(heap)，再尝试 VA-RGA；失败降级 OpenCV */
+    bool use_rga_va_fallback;
+
+    /** 阶段3实验：使用 get_dmabuf_fd + rga_resize_fd；失败冷却重试，最终降级 */
+    bool use_rga_fd_experimental;
 
     void run_check_thread();
 
