@@ -53,12 +53,18 @@ public:
 	~MppDecode();
 	void init(int width,int height);
 	int decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image);
+	/** init_packet_and_frame 完全成功且可安全 decode */
+	bool is_ready() const { return dataBuf != NULL && ctx != NULL && mpi != NULL; }
+
+	/** dup(2) 后的 dma-buf fd，供 RGA import；调用者必须在用完后 close。仅在最近一次 decode+get_image 成功后有效。 */
+	int get_dmabuf_fd(int *out_fd);
+	void get_last_rga_layout(RK_U32 *width, RK_U32 *height, RK_U32 *wstride_px, RK_U32 *hstride_px);
 
 private:
-	MppBufferGroup frmGrp;
-	MppBufferGroup pktGrp;
-	MppPacket      packet;
-	MppFrame       frame;
+	MppBufferGroup frmGrp   = NULL;
+	MppBufferGroup pktGrp   = NULL;
+	MppPacket      packet   = NULL;
+	MppFrame       frame    = NULL;
 	size_t         packetSize;
 
 	MppBuffer      frmBuf   = NULL;
@@ -67,7 +73,16 @@ private:
 	char *dataBuf = NULL;
 
 	MppCtx  ctx   = NULL;
-    MppApi *mpi   = NULL;
+	MppApi *mpi   = NULL;
+
+	/** 上一帧成功解码后，供 RGA 使用的 buffer 与布局（像素 stride 与 im2d wrapbuffer_fd 一致） */
+	MppBuffer last_rga_buffer = NULL;
+	RK_U32 last_w = 0;
+	RK_U32 last_h = 0;
+	RK_U32 last_wstride_px = 0;
+	RK_U32 last_hstride_px = 0;
+
+	/** pipeline 模式：持有上一帧 frame，直到下一次 decode() 调用时释放（buffer 生命周期管理） */
 
 	int init_mpp();
 	int init_packet_and_frame(int width, int height);
@@ -79,4 +94,3 @@ private:
 #endif
 
 #endif
-

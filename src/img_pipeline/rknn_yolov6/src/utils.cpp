@@ -145,7 +145,10 @@ int rknn_config(rknn_context &ctx,rknn_input_output_num &io_num,int &width,int &
 
 int rga_resize(cv::Mat &img,cv::Mat &img_resize,cv::Size &size)
 {
-    // init rga context
+    static bool rga_failed_latch = false;
+    if (rga_failed_latch)
+        return -1;
+
     rga_buffer_t src;
     rga_buffer_t dst;
     im_rect      src_rect;
@@ -155,23 +158,34 @@ int rga_resize(cv::Mat &img,cv::Mat &img_resize,cv::Size &size)
     memset(&src, 0, sizeof(src));
     memset(&dst, 0, sizeof(dst));
 
-
-//    printf("resize with RGA!\n");
-//    resize_buf = malloc(height * width * 3);
-//    memset(resize_buf, 0x00, height * width * 3);
-
-
     src = wrapbuffer_virtualaddr((void*)img.data, img.cols, img.rows, RK_FORMAT_RGB_888);
     dst = wrapbuffer_virtualaddr((void*)img_resize.data, size.width, size.height, RK_FORMAT_RGB_888);
-
 
     int ret = imcheck(src, dst, src_rect, dst_rect);
     if (IM_STATUS_NOERROR != ret)
     {
-        printf("%d, check error! %s", __LINE__, imStrError((IM_STATUS)ret));
+        printf("%d, check error! %s\n", __LINE__, imStrError((IM_STATUS)ret));
+        rga_failed_latch = true;
         return -1;
     }
-    IM_STATUS STATUS = imresize(src, dst);
+
+    im_opt_t opt;
+    memset(&opt, 0, sizeof(opt));
+    opt.core = IM_SCHEDULER_RGA3_CORE0;
+
+    rga_buffer_t pat;
+    im_rect pat_rect;
+    memset(&pat, 0, sizeof(pat));
+    memset(&pat_rect, 0, sizeof(pat_rect));
+
+    IM_STATUS STATUS = improcess(src, dst, pat, src_rect, dst_rect, pat_rect,
+                                 -1, NULL, &opt, IM_SYNC);
+
+    if (STATUS != IM_STATUS_SUCCESS && STATUS != IM_STATUS_NOERROR)
+    {
+        printf("rknn_yolov6 rga_resize failed (%d), latching to OpenCV fallback\n", (int)STATUS);
+        rga_failed_latch = true;
+    }
 
     return STATUS;
 

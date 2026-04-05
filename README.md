@@ -203,6 +203,31 @@ killall rosmaster
 
 ---
 
+## img_decode 性能说明（RGA / MPP 硬解码）
+
+> 详细调试过程见 [`src/img_pipeline/img_decode/RGA_MPP_硬解码链路调试报告.md`](src/img_pipeline/img_decode/RGA_MPP_硬解码链路调试报告.md)
+
+### 当前状态（2026-04-06 存档）
+
+| 指标 | 值 |
+|------|----|
+| `/image_raw/compressed`（相机输入） | ~30Hz（MJPEG 1280×720） |
+| `/camera/image_raw`（硬解 + 缩放输出） | **~25Hz** |
+| MPP JPEG 硬解码 | ✅ 正常（像素非零，RGB888） |
+| RGA(fd) 加速缩放 | ⚠️ 仍失败（ION 帧缓冲 PA>4GB，RGA2 无 IOMMU） |
+| OpenCV 回退路径 | ✅ 先 `copyTo(heap)` 再 resize，不在 uncached 内存上操作 |
+| 节点稳定性 | ✅ 无崩溃；RGA 每 30 帧自动重试 |
+
+### 关键参数（`img_decode.launch`）
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `use_rga` | `true` | 是否尝试 RGA 加速；失败自动回退 OpenCV |
+| `scale` | `0.5` | 输出分辨率缩放比（1280×720 → 640×360） |
+| `fps_div` | `1` | 帧率分频（1=不分频） |
+
+---
+
 ## 许可证与致谢
 
 - 工程源自 **cv-robot / newbot** 生态；使用与二次发布请遵循原项目及依赖库的许可。

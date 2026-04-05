@@ -37,6 +37,11 @@ public:
 
     string sub_jpeg_image_topic;
 
+    /** false：启动即订阅 JPEG（推荐，避免无人订 /camera/image_raw 时断流）；true：仅在有订阅者时再订阅压缩图 */
+    bool lazy_compressed_subscribe;
+
+    /** 是否尝试 RGA 缩放；若为 false 则始终 OpenCV（省 ioctl / 内核日志） */
+    bool use_rga;
 
     void run_check_thread();
 
