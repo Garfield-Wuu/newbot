@@ -1,0 +1,21 @@
+[Unit]
+Description=ROS rosbridge WebSocket (Foxglove Rosbridge, port 9090)
+After=network-online.target
+Wants=network-online.target
+# roscore 由 all.launch 等提供；若尚未就绪，服务会退出并由 Restart 稍后重试
+
+[Service]
+Type=simple
+User=orangepi
+Group=orangepi
+Environment=HOME=/home/orangepi
+WorkingDirectory=/home/orangepi/newbot_ws
+ExecStart=/home/orangepi/newbot_ws/scripts/run_rosbridge_websocket.sh
+Restart=on-failure
+RestartSec=5
+# 避免短时间内无限重启刷屏
+StartLimitIntervalSec=300
+StartLimitBurst=30
+
+[Install]
+WantedBy=multi-user.target

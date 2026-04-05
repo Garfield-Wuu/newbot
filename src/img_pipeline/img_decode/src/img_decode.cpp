@@ -78,8 +78,23 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
     //避免图像多次拷贝，直接将缩放后的数据写到msg_pub中
 
 #if(USE_ARM_LIB==1)
-    //硬缩放RGB->小RGB
-    rga_resize(image, msg_pub.data.data(), scale);//image-->msg_pub.data
+    // 硬缩放 RGB→小 RGB；RGA 对高地址 VA（如 MPP 解码缓冲）常映射失败，回退 OpenCV 以恢复 /camera/image_raw
+    {
+        int rga_ret = rga_resize(image, msg_pub.data.data(), scale);
+        // RGA im2d: IM_STATUS_SUCCESS==1, IM_STATUS_NOERROR==2；其余含 -1、0 均为失败
+        const bool rga_ok = (rga_ret == 1 || rga_ret == 2);
+        if (!rga_ok)
+        {
+            ROS_WARN_THROTTLE(5.0, "rga_resize failed (ret=%d), fallback to OpenCV resize", rga_ret);
+            cv::Mat resized;
+            cv::resize(image, resized, cv::Size(), scale, scale, cv::INTER_LINEAR);
+            msg_pub.height = resized.rows;
+            msg_pub.width = resized.cols;
+            msg_pub.step = msg_pub.width * 3;
+            msg_pub.data.resize(static_cast<size_t>(msg_pub.height) * msg_pub.step);
+            memcpy(msg_pub.data.data(), resized.data, msg_pub.data.size());
+        }
+    }
 #else
     //软缩放RGB->小RGB
     cv::resize(image, image, cv::Size(), scale, scale);
