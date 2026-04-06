@@ -145,9 +145,9 @@ int rknn_config(rknn_context &ctx,rknn_input_output_num &io_num,int &width,int &
 
 int rga_resize(cv::Mat &img,cv::Mat &img_resize,cv::Size &size)
 {
-    static bool rga_failed_latch = false;
-    if (rga_failed_latch)
-        return -1;
+    // RGA 在部分 VA/内存布局下会失败；若失败仍使用未填充的 img_resize 会导致 NPU 输入为垃圾、dets 恒为空。
+    // 策略：RGA 成功则用硬件缩放，否则本帧立即 OpenCV resize（与 img_decode 兜底一致）。
+    static bool logged_opencv_fallback = false;
 
     rga_buffer_t src;
     rga_buffer_t dst;
@@ -162,36 +162,39 @@ int rga_resize(cv::Mat &img,cv::Mat &img_resize,cv::Size &size)
     dst = wrapbuffer_virtualaddr((void*)img_resize.data, size.width, size.height, RK_FORMAT_RGB_888);
 
     int ret = imcheck(src, dst, src_rect, dst_rect);
-    if (IM_STATUS_NOERROR != ret)
+    if (ret == IM_STATUS_NOERROR || ret == IM_STATUS_SUCCESS)
     {
-        printf("%d, check error! %s\n", __LINE__, imStrError((IM_STATUS)ret));
-        rga_failed_latch = true;
-        return -1;
+        im_opt_t opt;
+        memset(&opt, 0, sizeof(opt));
+        // 虚拟地址源图：RGA2 对 VA 路径更稳（同 img_decode VA-RGA）
+        opt.core = IM_SCHEDULER_RGA2_CORE0;
+
+        rga_buffer_t pat;
+        im_rect pat_rect;
+        memset(&pat, 0, sizeof(pat));
+        memset(&pat_rect, 0, sizeof(pat_rect));
+
+        IM_STATUS STATUS = improcess(src, dst, pat, src_rect, dst_rect, pat_rect,
+                                     -1, NULL, &opt, IM_SYNC);
+        if (STATUS == IM_STATUS_SUCCESS || STATUS == IM_STATUS_NOERROR)
+            return 0;
+        if (!logged_opencv_fallback)
+        {
+            printf("rknn_yolov6 rga_resize improcess failed (%d), using OpenCV resize\n", (int)STATUS);
+            logged_opencv_fallback = true;
+        }
+    }
+    else
+    {
+        if (!logged_opencv_fallback)
+        {
+            printf("rknn_yolov6 rga_resize imcheck failed: %s, using OpenCV resize\n", imStrError((IM_STATUS)ret));
+            logged_opencv_fallback = true;
+        }
     }
 
-    im_opt_t opt;
-    memset(&opt, 0, sizeof(opt));
-    opt.core = IM_SCHEDULER_RGA3_CORE0;
-
-    rga_buffer_t pat;
-    im_rect pat_rect;
-    memset(&pat, 0, sizeof(pat));
-    memset(&pat_rect, 0, sizeof(pat_rect));
-
-    IM_STATUS STATUS = improcess(src, dst, pat, src_rect, dst_rect, pat_rect,
-                                 -1, NULL, &opt, IM_SYNC);
-
-    if (STATUS != IM_STATUS_SUCCESS && STATUS != IM_STATUS_NOERROR)
-    {
-        printf("rknn_yolov6 rga_resize failed (%d), latching to OpenCV fallback\n", (int)STATUS);
-        rga_failed_latch = true;
-    }
-
-    return STATUS;
-
-    // for debug
-    //cv::Mat resize_img(cv::Size(width, height), CV_8UC3, resize_buf);
-    //cv::imwrite("resize_input.jpg", resize_img);
+    cv::resize(img, img_resize, size, 0, 0, cv::INTER_LINEAR);
+    return 0;
 }
 
 
