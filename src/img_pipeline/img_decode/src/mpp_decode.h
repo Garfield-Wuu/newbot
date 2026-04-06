@@ -58,6 +58,10 @@ public:
 
 	/** dup(2) 后的 dma-buf fd，供 RGA import；调用者必须在用完后 close。仅在最近一次 decode+get_image 成功后有效。 */
 	int get_dmabuf_fd(int *out_fd);
+
+	/** 返回 frmDmaFd 原始值（无 dup），调用者禁止 close，生命周期与 MppDecode 对象绑定。
+	 *  仅当 frmDmaFd >= 0（system-dma32 路径成功）且 last_rga_buffer 有效时返回 >=0，否则返回 -1。 */
+	int get_raw_dmabuf_fd() const { return (frmDmaFd >= 0 && last_rga_buffer) ? frmDmaFd : -1; }
 	void get_last_rga_layout(RK_U32 *width, RK_U32 *height, RK_U32 *wstride_px, RK_U32 *hstride_px);
 
 private:
@@ -81,6 +85,11 @@ private:
 	RK_U32 last_h = 0;
 	RK_U32 last_wstride_px = 0;
 	RK_U32 last_hstride_px = 0;
+
+	/** 从 /dev/dma_heap/system-dma32 直接分配的 frmBuf（保证 <4GB PA，供 RGA FD 路径使用） */
+	int    frmDmaFd   = -1;
+	size_t frmDmaSize = 0;
+	void  *frmDmaMmap = NULL;
 
 	/** pipeline 模式：持有上一帧 frame，直到下一次 decode() 调用时释放（buffer 生命周期管理） */
 

@@ -42,6 +42,9 @@ export LIDAR_TYPE=YDLIDAR
 #export LIDAR_TYPE=M1C1_MINI
 #export LIDAR_TYPE=LD14
 
+# 加载 API 密钥（独立文件，不受 .bashrc 交互式守卫影响）
+[ -f /home/orangepi/.robot_env ] && source /home/orangepi/.robot_env
+
 source /opt/ros/noetic/setup.sh
 source /home/orangepi/newbot_ws/devel/setup.sh
 sleep 3 #等待3秒，防止网络不稳定引起的ROS启动错误

@@ -128,13 +128,12 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
             {
                 RK_U32 rw, rh, rws, rhs;
                 mpp_decode.get_last_rga_layout(&rw, &rh, &rws, &rhs);
-                int dmabuf_fd = -1;
-                if (mpp_decode.get_dmabuf_fd(&dmabuf_fd) == 0)
+                // 使用 raw fd（不 dup，不需要 close），缓存 importbuffer_fd 命中同一 fd
+                int dmabuf_fd = mpp_decode.get_raw_dmabuf_fd();
+                if (dmabuf_fd >= 0)
                 {
                     const int rga_fd_ret = rga_resize_fd(dmabuf_fd, (int)rw, (int)rh, (int)rws, (int)rhs,
                                                          msg_pub.data.data(), dst_w, dst_h);
-                    if (close(dmabuf_fd) != 0)
-                        ROS_WARN_THROTTLE(30.0, "close(dmabuf_fd) failed errno=%d", errno);
                     if (rga_fd_ret == 0)
                     {
                         ok = true;
@@ -148,7 +147,7 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
                 }
                 else
                 {
-                    ROS_WARN_THROTTLE(10.0, "img_decode: get_dmabuf_fd failed");
+                    ROS_WARN_THROTTLE(10.0, "img_decode: get_raw_dmabuf_fd failed (frmDmaFd not ready)");
                 }
             }
         }

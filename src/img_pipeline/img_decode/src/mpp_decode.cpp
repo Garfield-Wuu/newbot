@@ -1,6 +1,20 @@
 #if(USE_ARM_LIB==1)
 
 #include "mpp_decode.h"
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <stdint.h>
+
+#ifndef DMA_HEAP_IOCTL_ALLOC
+struct dma_heap_allocation_data {
+    uint64_t len;
+    uint32_t fd;
+    uint32_t fd_flags;
+    uint64_t heap_flags;
+};
+#define DMA_HEAP_IOCTL_ALLOC _IOWR('H', 0x0, struct dma_heap_allocation_data)
+#endif
 
 MppDecode::MppDecode()
 {
@@ -65,6 +79,14 @@ MppDecode::~MppDecode()
         frmGrp = NULL;
     }
 
+    if (frmDmaMmap) {
+        munmap(frmDmaMmap, frmDmaSize);
+        frmDmaMmap = NULL;
+    }
+    if (frmDmaFd >= 0) {
+        close(frmDmaFd);
+        frmDmaFd = -1;
+    }
 }
 
 
@@ -114,21 +136,52 @@ int MppDecode::init_packet_and_frame(int width, int height)
 
 	int ret;
 
-	// ION internal：环境变量 RK_DMA_HEAP_USE_DMA32=1 可令 MPP 在 <4GB 物理地址分配（RGA 兼容）
-	// DMA_HEAP internal 不导出 fd（mpp_buffer_get_fd 返回 0），因此用 ION 路径保留合法 fd
-	ret = mpp_buffer_group_get_internal(&frmGrp, MPP_BUFFER_TYPE_ION);
-	if (ret)
+	// 优先从 /dev/dma_heap/system-dma32 分配 frmBuf（保证 <4GB 物理地址，RGA IOMMU 可访问）
+	// 使用 external buffer group + mpp_buffer_commit 将 dma-buf 导入 MPP
+	bool frm_grp_ok = false;
 	{
-		fprintf(stderr, "[mpp_decode] frmGrp ION failed (%d), try DMA_HEAP\n", ret); fflush(stderr);
-		ret = mpp_buffer_group_get_internal(&frmGrp, MPP_BUFFER_TYPE_DMA_HEAP);
-		if (ret) {
-			fprintf(stderr, "[mpp_decode] frmGrp DMA_HEAP also failed (%d)\n", ret); fflush(stderr);
-			return -1;
+		int heap_fd = open("/dev/dma_heap/system-dma32", O_RDWR | O_CLOEXEC);
+		if (heap_fd >= 0) {
+			struct dma_heap_allocation_data alloc = {};
+			alloc.len      = buf_size;
+			alloc.fd_flags = O_RDWR | O_CLOEXEC;
+			if (ioctl(heap_fd, DMA_HEAP_IOCTL_ALLOC, &alloc) == 0) {
+				void *mptr = mmap(NULL, buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, (int)alloc.fd, 0);
+				if (mptr != MAP_FAILED) {
+					ret = mpp_buffer_group_get_external(&frmGrp, MPP_BUFFER_TYPE_DRM);
+					if (ret == MPP_OK) {
+						MppBufferInfo binfo = {};
+						binfo.type = MPP_BUFFER_TYPE_DRM;
+						binfo.fd   = (int)alloc.fd;
+						binfo.ptr  = mptr;
+						binfo.size = buf_size;
+						ret = mpp_buffer_commit(frmGrp, &binfo);
+						if (ret == MPP_OK) {
+							frmDmaFd   = (int)alloc.fd;
+							frmDmaSize = buf_size;
+							frmDmaMmap = mptr;
+							frm_grp_ok = true;
+						} else {
+							mpp_buffer_group_put(frmGrp); frmGrp = NULL;
+						}
+					}
+					if (!frm_grp_ok)
+						munmap(mptr, buf_size);
+				}
+				if (!frm_grp_ok)
+					close((int)alloc.fd);
+			}
+			close(heap_fd);
 		}
 	}
-	else
-	{
-		fprintf(stderr, "[mpp_decode] frmGrp ION ok\n"); fflush(stderr);
+	if (!frm_grp_ok) {
+		// 回退：ION internal（依赖环境变量 RK_DMA_HEAP_USE_DMA32=1 尽量分配在 <4GB）
+		printf("[mpp_decode] system-dma32 external grp failed, fallback to ION\n");
+		ret = mpp_buffer_group_get_internal(&frmGrp, MPP_BUFFER_TYPE_ION);
+		if (ret) {
+			ret = mpp_buffer_group_get_internal(&frmGrp, MPP_BUFFER_TYPE_DMA_HEAP);
+			if (ret) return -1;
+		}
 	}
 
 	ret = mpp_buffer_group_get_internal(&pktGrp, MPP_BUFFER_TYPE_ION);
@@ -190,8 +243,9 @@ int MppDecode::init_packet_and_frame(int width, int height)
 
 	mpp_frame_set_buffer(frame, frmBuf);
 
-	fprintf(stderr, "[mpp_decode] init ok: buf_size=%zu frm_fd=%d frm_ptr=%p\n",
-	        buf_size, mpp_buffer_get_fd(frmBuf), mpp_buffer_get_ptr(frmBuf)); fflush(stderr);
+	printf("[mpp_decode] init ok: buf_size=%zu frm_fd=%d frm_ptr=%p dma32=%s\n",
+	       buf_size, mpp_buffer_get_fd(frmBuf), mpp_buffer_get_ptr(frmBuf),
+	       frmDmaFd >= 0 ? "yes" : "no(ION fallback)");
 
 	return 0;
 }
@@ -302,6 +356,12 @@ int MppDecode::get_dmabuf_fd(int *out_fd)
 {
 	if (!out_fd || !last_rga_buffer)
 		return -1;
+	// 优先使用 system-dma32 直接分配的 fd（保证 <4GB PA，RGA 必然可 import）
+	if (frmDmaFd >= 0) {
+		int d = dup(frmDmaFd);
+		if (d >= 0) { *out_fd = d; return 0; }
+	}
+	// fallback：从 MPP buffer 获取 fd
 	int raw = mpp_buffer_get_fd(last_rga_buffer);
 	if (raw < 0)
 		return -1;
