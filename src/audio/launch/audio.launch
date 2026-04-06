@@ -1,13 +1,8 @@
 <?xml version="1.0"?>
 <launch>
 
+  <!-- 科大讯飞等 API 凭证：勿写在此文件。请在 ~/.robot_env 中 export，并由 start.sh 在 roslaunch 前 source。 -->
   <node pkg="audio" name="audio" type="main.py" output="screen">
-    <!-- 科大讯飞 Spark API 凭证（写在 launch 里确保开机自启动时也能获取，不受 .bashrc 交互式守卫影响） -->
-    <env name="XUNFEI_APPID"     value="bfbdf10b" />
-    <env name="XUNFEI_APIKEY"    value="c5ba520d7f20cfe7d7c318f1a040744c" />
-    <env name="XUNFEI_APISECRET" value="N2I1M2I3M2M4Mzk1ZjE4NTdlMGZhZDdk" />
-    <env name="EMAIL_ADDRESS"    value="962047326@qq.com" />
-    <env name="EMAIL_PWD"        value="wavxdxsxtdecbfbd" />
   </node>
 
 </launch>

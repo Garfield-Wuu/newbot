@@ -1,0 +1,8 @@
+# 复制本文件到 ~/.robot_env，填入真实值后 chmod 600 ~/.robot_env
+# 开机自启动走 rc.local -> start.sh，会 source ~/.robot_env（不受 .bashrc 交互式守卫影响）
+
+export XUNFEI_APPID="你的APPID"
+export XUNFEI_APIKEY="你的APIKey"
+export XUNFEI_APISECRET="你的APISecret"
+export EMAIL_ADDRESS='你的邮箱'
+export EMAIL_PWD='你的邮箱授权码'
