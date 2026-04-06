@@ -21,6 +21,7 @@ ROS Noetic workspace for the Newbot robot on Orange Pi: voice (ASR/TTS, iFlytek 
 | **ASR 模型** | `src/audio/scripts/model/` 体积大（含 ONNX 等），已写入 `.gitignore`。克隆后请从**原网盘 / NFS / 备份**拷回该目录，否则离线语音识别不可用。 |
 | **编译** | `cd ~/newbot_ws`，先关闭正在运行的 ROS（如 `killall rosmaster`），再 `source /opt/ros/noetic/setup.bash && catkin_make`（内存不足时用 `-j1`）。 |
 | **雷达类型** | `export LIDAR_TYPE=YDLIDAR` 或 `M1C1_MINI` 等，须与 **`~/.bashrc`** 和 **`src/config/start.sh`** 一致（见官方文档第四节）。 |
+| **讯飞 / 邮件等密钥** | **勿写入** `audio.launch` 或提交到 Git。将 `src/config/robot_env.example` 复制为 **`~/.robot_env`**，填入真实值后 `chmod 600 ~/.robot_env`。开机自启由 **`src/config/start.sh`** 在 `roslaunch` 前 **`source ~/.robot_env`**，子节点继承环境变量。仅依赖 **`~/.bashrc`** 在**非交互**开机脚本里会失效（`.bashrc` 开头有「非交互则 return」守卫，export 不会执行）。 |
 
 ---
 
@@ -110,7 +111,7 @@ catkin_make -j2    # 内存不够改用 -j1
 ```
 
 - 将 **离线 ASR 模型** 拷入 **`~/newbot_ws/src/audio/scripts/model/`**（若 zip 未含或本仓库 clone 被 `.gitignore` 排除）。  
-- 在 **`~/.bashrc`** 增加 **`XUNFEI_APPID` / `XUNFEI_APIKEY` / `XUNFEI_APISECRET`**（及按需其它变量）。  
+- **讯飞星火等 API**：复制 **`src/config/robot_env.example` → `~/.robot_env`**，填写 **`XUNFEI_APPID` / `XUNFEI_APIKEY` / `XUNFEI_APISECRET`** 等，`chmod 600 ~/.robot_env`。**`start.sh` 已包含** `source ~/.robot_env`，开机自启即可生效。交互式终端可继续在 **`~/.bashrc`** 里 export 以便手动 `roslaunch`，但**不要**把真实密钥写进 launch 或提交仓库。  
 - 打开 **`~/newbot_ws/src/config/start.sh`**，确认 **`LIDAR_TYPE`** 与 **`~/.bashrc`** 一致。  
 - 重启后由 **`rc.local` → start.sh** 拉起的 **`roslaunch pkg_launch all.launch`** 才会使用新环境。
 
@@ -155,8 +156,9 @@ bash ~/newbot_ws/scripts/install_orangepi_board.sh
 
 - WebSocket 地址须为 **`wss://spark-api.xf-yun.com/v1.1/chat`**（文档与控制台一致，勿用明文 `ws://`）。
 - **`domain` 必须为 `lite`**（Spark Lite）；误用 `general` 易出现 **11200 / AppIdNoAuthError**。
-- 在 **`~/.bashrc`** 或 **启动 `roslaunch` 的同一环境** 中配置：  
-  `XUNFEI_APPID`、`XUNFEI_APIKEY`、`XUNFEI_APISECRET`。  
+- **凭证配置（推荐）**：在 **`~/.robot_env`** 中 `export XUNFEI_APPID`、`XUNFEI_APIKEY`、`XUNFEI_APISECRET`（模板见 **`src/config/robot_env.example`**）。**`start.sh`** 会在 `roslaunch` 前 `source` 该文件，**开机自启**与 **手动** `roslaunch pkg_launch all.launch`（若在同一 shell 里先 `source ~/.robot_env`）均可生效。  
+- **勿**把密钥写进 **`audio.launch`**：仓库内仅保留说明注释；历史上若曾将密钥提交到 Git，请在讯飞控制台**轮换**密钥。  
+- 交互式开发仍可在 **`~/.bashrc`** 中 export；注意 **rc.local 非交互启动**时 `.bashrc` 可能不执行 export，故生产环境以 **`~/.robot_env` + start.sh** 为准。  
 - **`audio/scripts/main.py` 不应再硬编码上述变量**（已移除旧逻辑），否则覆盖环境变量会导致对话恒为「这个问题我还不知道呢」。
 
 ### 语音指令：`/tts` 与 `/asr_id`
@@ -207,23 +209,26 @@ killall rosmaster
 
 > 详细调试过程见 [`src/img_pipeline/img_decode/RGA_MPP_硬解码链路调试报告.md`](src/img_pipeline/img_decode/RGA_MPP_硬解码链路调试报告.md)
 
-### 当前状态（2026-04-06 存档）
+### 当前状态（2026-04-06 起，`feature/rga-dma32-accel` 主线）
 
 | 指标 | 值 |
 |------|----|
-| `/image_raw/compressed`（相机输入） | ~30Hz（MJPEG 1280×720） |
-| `/camera/image_raw`（硬解 + 缩放输出） | **~25Hz** |
-| MPP JPEG 硬解码 | ✅ 正常（像素非零，RGB888） |
-| RGA(fd) 加速缩放 | ⚠️ 仍失败（ION 帧缓冲 PA>4GB，RGA2 无 IOMMU） |
-| OpenCV 回退路径 | ✅ 先 `copyTo(heap)` 再 resize，不在 uncached 内存上操作 |
-| 节点稳定性 | ✅ 无崩溃；RGA 每 30 帧自动重试 |
+| `/image_raw/compressed`（相机输入） | 随 USB/驱动，常见 **~14–30Hz**（MJPEG 1280×720） |
+| `/camera/image_raw`（硬解 + 缩放） | 与压缩流同量级；**FD-RGA 成功时** CPU 占用低（约个位数 %） |
+| MPP JPEG 硬解码 | ✅ 正常（RGB888） |
+| **FD-RGA（`use_rga_fd_experimental`）** | ✅ **已打通**：解码帧缓冲优先从 **`/dev/dma_heap/system-dma32`** 经 MPP **external buffer group** 导入，保证物理地址落在 **低 4GB**（满足 RGA 32-bit IOMMU）；`rga_resize_fd` 对 **src/dst** 使用 **importbuffer + handle**，**dst** 从 **system-dma32** 分配；**RgaFdCache** 缓存 handle 与 dst dma-buf，避免每帧重复 ioctl/mmap |
+| launch 环境 | `RK_DMA_HEAP_USE_DMA32=1`、`ION_HEAP_MASK=8` 辅助 ION 倾向低地址（与 dma32 帧缓冲配合） |
+| OpenCV 回退 | ✅ 先 **`copyTo(heap)`** 再 resize；FD/VA 路径失败时每 **30 帧**自动重试 |
+| 节点稳定性 | ✅ 无崩溃；`check_thread.detach()` 避免管道关闭时 `std::terminate` |
 
 ### 关键参数（`img_decode.launch`）
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `use_rga` | `true` | 是否尝试 RGA 加速；失败自动回退 OpenCV |
-| `scale` | `0.5` | 输出分辨率缩放比（1280×720 → 640×360） |
+| `use_rga_fd_experimental` | `true` | **生产推荐**：FD-RGA（dma-buf + RGA3）；失败回退 OpenCV |
+| `use_rga_va_fallback` | `false` | 实验：heap 上 VA-RGA（RGA2）；与 FD 路径二选一实验时用 |
+| `use_rga` | `false` | 旧参数，保留兼容；**不再**作为主线开关 |
+| `scale` | `0.5` | 输出缩放（如 1280×720 → 640×360） |
 | `fps_div` | `1` | 帧率分频（1=不分频） |
 
 ---
